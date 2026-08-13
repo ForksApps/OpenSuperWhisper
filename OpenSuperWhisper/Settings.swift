@@ -1126,6 +1126,31 @@ struct SettingsDownloadableModels {
             size: 574,
             description: "Fastest processing"
         ),
+        // The only models here that translate. Every Turbo build above returns the source
+        // language unchanged with the translate task set, measured on the same clip, so until
+        // these existed there was no configuration in the app that could translate at all. Two
+        // users found that out the hard way and one went and installed a model by hand (#86).
+        SettingsDownloadableModel(
+            name: "Large v3 — translates",
+            isDownloaded: false,
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin?download=true")!,
+            size: 2951,
+            description: "Slower than Turbo, and the most accurate. Can translate to English"
+        ),
+        SettingsDownloadableModel(
+            name: "Medium — translates",
+            isDownloaded: false,
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin?download=true")!,
+            size: 1462,
+            description: "A middle ground. Can translate to English"
+        ),
+        SettingsDownloadableModel(
+            name: "Small — translates",
+            isDownloaded: false,
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin?download=true")!,
+            size: 465,
+            description: "Light, less accurate. Can translate to English"
+        ),
         // Distil large-v3 was here briefly — dropped after our FLEURS benchmark: on
         // Metal it matches large-v3-turbo's speed exactly (the shared large encoder
         // dominates short dictation clips) with worse accuracy (8% vs 5.9% WER) and
