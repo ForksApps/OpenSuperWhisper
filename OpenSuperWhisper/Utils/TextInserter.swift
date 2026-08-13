@@ -28,13 +28,38 @@ enum TextInserter {
         return result
     }
 
+    /// Pause between chunks, so the receiving app gets a chance to process each one.
+    ///
+    /// Unpaced, a 400-character dictation is ~40 key events posted inside a millisecond. An app
+    /// that re-renders its whole input area per keystroke falls behind, and its buffer and caret
+    /// drift apart: reported as existing text duplicated two or three times with the new speech
+    /// wedged inside, in a terminal TUI, and it got likelier the fuller the input box already was
+    /// (#85). Paste mode was unaffected, which is one event instead of forty.
+    static let chunkPauseMicroseconds: useconds_t = 2_000
+
+    /// Ceiling on the delay this adds in total. Typing runs on the main thread, and it has to:
+    /// the caller presses Return after it returns, so going async would race the submit key
+    /// against the text. A very long dictation therefore trades pacing for responsiveness rather
+    /// than freezing the app.
+    static let maxTotalPauseMicroseconds: useconds_t = 500_000
+
+    /// How long to wait between chunks for a text of `chunkCount` chunks.
+    static func chunkPause(forChunkCount chunkCount: Int) -> useconds_t {
+        guard chunkCount > 1 else { return 0 }
+        let gaps = useconds_t(chunkCount - 1)
+        return min(chunkPauseMicroseconds, maxTotalPauseMicroseconds / gaps)
+    }
+
     /// Types `text` into the focused app as Unicode keyboard events. Each chunk
     /// is sent as one key-down/key-up pair carrying the Unicode string; modifier
     /// flags are cleared so a still-held hotkey can't combine with the input.
     static func type(_ text: String) {
         guard let source = CGEventSource(stateID: .combinedSessionState) else { return }
 
-        for chunk in chunks(of: text) {
+        let allChunks = chunks(of: text)
+        let pause = chunkPause(forChunkCount: allChunks.count)
+
+        for (index, chunk) in allChunks.enumerated() {
             guard
                 let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
                 let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
@@ -48,6 +73,10 @@ enum TextInserter {
 
             keyDown.post(tap: .cghidEventTap)
             keyUp.post(tap: .cghidEventTap)
+
+            if pause > 0 && index < allChunks.count - 1 {
+                usleep(pause)
+            }
         }
     }
 
