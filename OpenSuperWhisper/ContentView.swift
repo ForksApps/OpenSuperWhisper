@@ -488,11 +488,11 @@ struct ContentView: View {
                                         .padding(.top, 40)
 
                                     Text("No results found")
-                                        .font(.headline)
+                                        .scaledFont(size: 13, weight: .semibold)
                                         .foregroundColor(.secondary)
 
                                     Text("Try different search terms")
-                                        .font(.subheadline)
+                                        .scaledFont(size: 11, weight: .regular)
                                         .foregroundColor(.secondary)
                                         .multilineTextAlignment(.center)
                                         .padding(.horizontal)
@@ -504,11 +504,11 @@ struct ContentView: View {
                                         .padding(.top, 40)
 
                                     Text("No recordings yet")
-                                        .font(.headline)
+                                        .scaledFont(size: 13, weight: .semibold)
                                         .foregroundColor(.secondary)
 
                                     Text("Tap the record button below to get started")
-                                        .font(.subheadline)
+                                        .scaledFont(size: 11, weight: .regular)
                                         .foregroundColor(.secondary)
                                         .multilineTextAlignment(.center)
                                         .padding(.horizontal)
@@ -516,12 +516,12 @@ struct ContentView: View {
                                     if let shortcut = KeyboardShortcuts.getShortcut(for: .toggleRecord) {
                                         VStack(spacing: 8) {
                                             Text("Pro Tip:")
-                                                .font(.subheadline)
+                                                .scaledFont(size: 11, weight: .regular)
                                                 .foregroundColor(.secondary)
 
                                             HStack(spacing: 4) {
                                                 Text("Press")
-                                                    .font(.subheadline)
+                                                    .scaledFont(size: 11, weight: .regular)
                                                     .foregroundColor(.secondary)
                                                 Text(shortcut.description)
                                                     .scaledFont(size: 16, weight: .medium)
@@ -530,12 +530,12 @@ struct ContentView: View {
                                                     .background(Color.secondary.opacity(0.2))
                                                     .cornerRadius(6)
                                                 Text("anywhere")
-                                                    .font(.subheadline)
+                                                    .scaledFont(size: 11, weight: .regular)
                                                     .foregroundColor(.secondary)
                                             }
 
                                             Text("to quickly record and paste text")
-                                                .font(.subheadline)
+                                                .scaledFont(size: 11, weight: .regular)
                                                 .foregroundColor(.secondary)
                                         }
                                         .padding(.top, 16)
@@ -623,13 +623,13 @@ struct ContentView: View {
                                     .foregroundColor(.red)
                                     .imageScale(.small)
                                 Text(engineError)
-                                    .font(.caption)
+                                    .scaledFont(size: 10, weight: .regular)
                                     .foregroundColor(.red)
                                     .lineLimit(2)
                                 Button("Retry") {
                                     viewModel.transcriptionService.reloadEngine()
                                 }
-                                .font(.caption)
+                                .scaledFont(size: 10, weight: .regular)
                                 .buttonStyle(.plain)
                                 .foregroundColor(.accentColor)
                             }
@@ -644,7 +644,7 @@ struct ContentView: View {
                                     .foregroundColor(.orange)
                                     .imageScale(.small)
                                 Text(errorMessage)
-                                    .font(.caption)
+                                    .scaledFont(size: 10, weight: .regular)
                                     .foregroundColor(.secondary)
                             }
                             .transition(.opacity.combined(with: .move(edge: .top)))
@@ -657,10 +657,10 @@ struct ContentView: View {
                                 // Подсказка о шорткате
                                 HStack(spacing: 6) {
                                     Text(currentShortcutDescription)
-                                        .font(.caption)
+                                        .scaledFont(size: 10, weight: .regular)
                                         .foregroundColor(.secondary)
                                     Text("to show mini recorder")
-                                        .font(.caption)
+                                        .scaledFont(size: 10, weight: .regular)
                                         .foregroundColor(.secondary)
                                 }
                                 .padding(.leading, 4)
@@ -671,7 +671,7 @@ struct ContentView: View {
                                         .foregroundColor(.secondary)
                                         .imageScale(.medium)
                                     Text("Drop audio file here to transcribe")
-                                        .font(.caption)
+                                        .scaledFont(size: 10, weight: .regular)
                                         .foregroundColor(.secondary)
                                 }
                                 .padding(.leading, 4)
@@ -687,7 +687,7 @@ struct ContentView: View {
                                         showDeleteConfirmation = true
                                     }) {
                                         Image(systemName: "trash")
-                                            .font(.title3)
+                                            .scaledFont(size: 15, weight: .regular)
                                             .foregroundColor(.secondary)
                                             .frame(width: 32, height: 32)
                                             .background(ThemePalette.panelSurface(colorScheme))
@@ -718,7 +718,7 @@ struct ContentView: View {
                                     openSettingsWindow(id: "settings")
                                 }) {
                                     Image(systemName: "gear")
-                                        .font(.title3)
+                                        .scaledFont(size: 15, weight: .regular)
                                         .foregroundColor(.secondary)
                                         .frame(width: 32, height: 32)
                                         .background(ThemePalette.panelSurface(colorScheme))
@@ -780,7 +780,7 @@ struct ContentView: View {
                              ? "Loading Parakeet Model..."
                              : "Loading Whisper Model...")
                             .foregroundColor(.white)
-                            .font(.headline)
+                            .scaledFont(size: 13, weight: .semibold)
                     }
                 }
                 .ignoresSafeArea()
@@ -807,7 +807,7 @@ struct PermissionsView: View {
     var body: some View {
         VStack(spacing: 20) {
             Text("Required Permissions")
-                .font(.title)
+                .scaledFont(size: 22, weight: .regular)
                 .padding()
 
             PermissionRow(
@@ -846,7 +846,7 @@ struct PermissionRow: View {
                     .foregroundColor(isGranted ? .green : .red)
 
                 Text(title)
-                    .font(.headline)
+                    .scaledFont(size: 13, weight: .semibold)
 
                 Spacer()
 
@@ -859,7 +859,7 @@ struct PermissionRow: View {
             }
 
             Text(description)
-                .font(.subheadline)
+                .scaledFont(size: 11, weight: .regular)
                 .foregroundColor(.secondary)
         }
         .padding()
@@ -956,7 +956,7 @@ struct RecordingRow: View {
                     HStack(spacing: 6) {
                         if recording.status == .pending {
                             Image(systemName: "clock")
-                                .font(.caption)
+                                .scaledFont(size: 10, weight: .regular)
                                 .foregroundColor(.secondary)
                         } else {
                            
@@ -982,7 +982,7 @@ struct RecordingRow: View {
                         }
                         
                         Text(statusText)
-                            .font(.caption)
+                            .scaledFont(size: 10, weight: .regular)
                             .foregroundColor(.secondary)
                         
                         Spacer()
@@ -999,16 +999,16 @@ struct RecordingRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
+                            .scaledFont(size: 10, weight: .regular)
                             .foregroundColor(.red)
                         Text("Transcription failed")
-                            .font(.caption)
+                            .scaledFont(size: 10, weight: .regular)
                             .foregroundColor(.red)
                     }
                     
                     if !recording.transcription.isEmpty {
                         Text(recording.transcription)
-                            .font(.caption)
+                            .scaledFont(size: 10, weight: .regular)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -1031,7 +1031,7 @@ struct RecordingRow: View {
                 .padding(.top, isPending && !isRegenerating ? 4 : 8)
             } else if !isPending {
                 Text("No speech detected")
-                    .font(.body)
+                    .scaledFont(size: 13, weight: .regular)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
@@ -1046,7 +1046,7 @@ struct RecordingRow: View {
                     // Row 1: date (left) · time / duration / words (right).
                     HStack(spacing: 8) {
                         Text(recording.timestamp, style: .date)
-                            .font(.subheadline)
+                            .scaledFont(size: 11, weight: .regular)
                         Spacer(minLength: 8)
                         HStack(spacing: 4) {
                             Text(recording.timestamp, style: .time)
@@ -1055,7 +1055,7 @@ struct RecordingRow: View {
                             Text("·")
                             Text("^[\(TextUtil.wordCount(recording.transcription)) word](inflect: true)")
                         }
-                        .font(.caption)
+                        .scaledFont(size: 10, weight: .regular)
                     }
 
                     // Row 2: source app / site (left) · model used (right, cpu glyph).
@@ -1087,7 +1087,7 @@ struct RecordingRow: View {
                                       : "")
                             }
                         }
-                        .font(.caption2)
+                        .scaledFont(size: 10, weight: .regular)
                     }
                 }
                 .foregroundColor(.secondary)
@@ -1098,7 +1098,7 @@ struct RecordingRow: View {
                     HStack(spacing: 6) {
                         if recording.status == .pending {
                             Image(systemName: "clock")
-                                .font(.caption)
+                                .scaledFont(size: 10, weight: .regular)
                                 .foregroundColor(.secondary)
                         } else {
                             ZStack {
@@ -1123,7 +1123,7 @@ struct RecordingRow: View {
                         }
                         
                         Text(statusText)
-                            .font(.caption)
+                            .scaledFont(size: 10, weight: .regular)
                             .foregroundColor(.secondary)
                     }
                     .transition(.opacity)
@@ -1333,7 +1333,7 @@ struct TranscriptionView: View {
                 if isExpanded {
                     ScrollView {
                         highlightedText
-                            .font(.body)
+                            .scaledFont(size: 13, weight: .regular)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
                     }
@@ -1351,7 +1351,7 @@ struct TranscriptionView: View {
                     if hasMoreLines {
                         Button(action: { isExpanded.toggle() }) {
                             highlightedText
-                                .font(.body)
+                                .scaledFont(size: 13, weight: .regular)
                                 .lineLimit(3)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
@@ -1360,7 +1360,7 @@ struct TranscriptionView: View {
                         .buttonStyle(.plain)
                     } else {
                         highlightedText
-                            .font(.body)
+                            .scaledFont(size: 13, weight: .regular)
                             .lineLimit(3)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
@@ -1376,7 +1376,7 @@ struct TranscriptionView: View {
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     }
                     .foregroundColor(ThemePalette.linkText(colorScheme))
-                    .font(.footnote)
+                    .scaledFont(size: 10, weight: .regular)
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
@@ -1415,7 +1415,7 @@ struct MicrophonePickerIconView: View {
             showMenu.toggle()
         }) {
             Image(systemName: microphoneService.availableMicrophones.isEmpty ? "mic.slash" : "mic.fill")
-                .font(.title3)
+                .scaledFont(size: 15, weight: .regular)
                 .foregroundColor(.secondary)
                 .frame(width: 32, height: 32)
                 .background(ThemePalette.panelSurface(colorScheme))

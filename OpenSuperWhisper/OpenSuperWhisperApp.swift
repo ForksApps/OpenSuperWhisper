@@ -27,6 +27,11 @@ struct OpenSuperWhisperApp: App {
     @StateObject private var appState = AppState()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    /// Same key as `AppPreferences.textScale`, read through @AppStorage so the window redraws
+    /// when the slider moves. Reading the preference directly would not: that is what made the
+    /// slider appear to do nothing in 0.10.1 (#82).
+    @AppStorage("textScale") private var textScale: Double = TextScale.default
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -39,6 +44,11 @@ struct OpenSuperWhisperApp: App {
             .frame(width: 450)
             .frame(minHeight: 400, maxHeight: 900)
             .environmentObject(appState)
+            // The main window never had this, so its history list ignored the text size
+            // setting entirely while Settings obeyed it. Read through @AppStorage rather than
+            // from AppPreferences: preferences aren't observed, and a value read once at window
+            // construction is what made the slider look dead before (#82).
+            .environment(\.appTextScale, textScale)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 450, height: 650)

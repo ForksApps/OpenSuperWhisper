@@ -2536,7 +2536,7 @@ struct FluidAudioModelDownloadItemView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(model.name)
-                        .font(.subheadline)
+                        .scaledFont(size: 11, weight: .regular)
                         .fontWeight(.medium)
                     
                     if model.isDownloaded {
@@ -2551,7 +2551,7 @@ struct FluidAudioModelDownloadItemView: View {
                     Text("·")
                     Text(model.sizeString)
                 }
-                .font(.caption)
+                .scaledFont(size: 10, weight: .regular)
                 .foregroundColor(.secondary)
 
                 if viewModel.isDownloading && viewModel.downloadingModelName == model.name {
@@ -2656,7 +2656,7 @@ struct ModelDownloadItemView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(model.name)
-                        .font(.subheadline)
+                        .scaledFont(size: 11, weight: .regular)
                         .fontWeight(.medium)
 
                     if model.isDownloaded {
@@ -2671,7 +2671,7 @@ struct ModelDownloadItemView: View {
                     Text("·")
                     Text(model.sizeString)
                 }
-                .font(.caption)
+                .scaledFont(size: 10, weight: .regular)
                 .foregroundColor(.secondary)
 
                 if model.downloadProgress > 0 && model.downloadProgress < 1 {
