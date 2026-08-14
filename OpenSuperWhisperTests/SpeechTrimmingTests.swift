@@ -14,15 +14,29 @@ final class SpeechTrimmingTests: XCTestCase {
         (0..<(seconds * sampleRate)).map { Float($0) }
     }
 
-    func testKeepsOnlyTheSpeechRegion() {
+    func testKeepsTheSpeechRegionWithRoomBeforeItAndLittleAfter() {
         let samples = ramp(seconds: 10)
-        // Speech from 2s to 4s, plus the 0.1s of trailing overlap whisper.cpp also keeps.
         let trimmed = WhisperEngine.speechOnlySamples(
             from: samples, segments: [WhisperVadSegment(startCs: 200, endCs: 400)])
 
-        XCTAssertEqual(trimmed.count, 2 * sampleRate + sampleRate / 10)
-        XCTAssertEqual(trimmed.first, Float(2 * sampleRate),
-                       "the kept audio must start exactly where speech starts")
+        let onset = WhisperEngine.onsetPaddingMs * sampleRate / 1000
+        let tail = WhisperEngine.tailPaddingMs * sampleRate / 1000
+        XCTAssertEqual(trimmed.count, 2 * sampleRate + onset + tail)
+        XCTAssertEqual(trimmed.first, Float(2 * sampleRate - onset),
+                       "the kept audio starts before the speech, to protect the first consonant")
+    }
+
+    /// The two ends want opposite things: room before the first word so its opening consonant
+    /// survives, and as little as possible after the last, because trailing silence is what makes
+    /// Whisper invent a closing phrase (#87).
+    func testTheTailIsMuchShorterThanTheOnset() {
+        XCTAssertLessThan(WhisperEngine.tailPaddingMs, WhisperEngine.onsetPaddingMs / 4)
+    }
+
+    /// The regression this came from: 100ms of VAD padding on both sides plus 100ms of overlap
+    /// on every segment end left 200ms of non-speech at the end of the clip.
+    func testTheTailIsShorterThanItWasWhenHallucinationWasReported() {
+        XCTAssertLessThan(WhisperEngine.tailPaddingMs, 100)
     }
 
     /// Two segments are separated by a short silence so the decoder still hears a pause,
@@ -35,12 +49,16 @@ final class SpeechTrimmingTests: XCTestCase {
                        WhisperVadSegment(startCs: 500, endCs: 600)])
 
         let oneSecond = sampleRate
-        let overlap = sampleRate / 10
-        XCTAssertEqual(trimmed.count, 2 * (oneSecond + overlap) + overlap)
+        let onset = WhisperEngine.onsetPaddingMs * sampleRate / 1000
+        let interior = WhisperEngine.interiorOverlapMs * sampleRate / 1000
+        let tail = WhisperEngine.tailPaddingMs * sampleRate / 1000
 
-        let gapStart = oneSecond + overlap
-        XCTAssertEqual(Array(trimmed[gapStart..<(gapStart + overlap)]),
-                       [Float](repeating: 0, count: overlap))
+        // first: onset + 1s + interior, then the gap, then: 1s + tail
+        XCTAssertEqual(trimmed.count, (onset + oneSecond + interior) + interior + (oneSecond + tail))
+
+        let gapStart = onset + oneSecond + interior
+        XCTAssertEqual(Array(trimmed[gapStart..<(gapStart + interior)]),
+                       [Float](repeating: 0, count: interior))
     }
 
     /// No speech found is *not* a verdict of silence: the caller re-sends the whole clip, so
@@ -66,7 +84,8 @@ final class SpeechTrimmingTests: XCTestCase {
         let trimmed = WhisperEngine.speechOnlySamples(
             from: samples, segments: [WhisperVadSegment(startCs: 100, endCs: 9999)])
 
-        XCTAssertEqual(trimmed.count, sampleRate, "clamped to what the clip actually holds")
+        let onset = WhisperEngine.onsetPaddingMs * sampleRate / 1000
+        XCTAssertEqual(trimmed.count, sampleRate + onset, "clamped to what the clip actually holds")
         XCTAssertEqual(trimmed.last, Float(2 * sampleRate - 1))
     }
 

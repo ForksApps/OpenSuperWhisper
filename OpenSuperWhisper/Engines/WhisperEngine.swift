@@ -296,32 +296,60 @@ class WhisperEngine: TranscriptionEngine {
         }
         // whisper.cpp discards speech shorter than 250ms, which is about the length of "yes"
         // or "non" — fine when transcribing an hour of audio, wrong when someone is dictating
-        // one. The wider padding likewise protects word onsets, since Whisper mistranscribes a
-        // word whose first consonant got clipped. Both trade a little kept silence for words.
-        return vadContext?.speechSegments(in: samples, minSpeechMs: 100, padMs: 100) ?? []
+        // one.
+        //
+        // Padding stays at whisper.cpp's own value because its knob is symmetric, and the two
+        // ends want opposite things: room before the first word, as little as possible after the
+        // last. `speechOnlySamples` does that asymmetrically instead (#87).
+        return vadContext?.speechSegments(in: samples, minSpeechMs: 100, padMs: 30) ?? []
     }
 
     /// Stitches the speech regions back into one buffer, mirroring what whisper.cpp does
     /// internally: each segment carries 0.1s of the audio that follows it, and segments are
     /// joined by 0.1s of silence so the decoder still hears a pause between phrases.
+    static let vadSampleRate = 16000
+
+    /// Kept before the first word. Whisper mistranscribes a word whose opening consonant is
+    /// clipped, and the VAD's own boundary is tight.
+    static let onsetPaddingMs = 150
+
+    /// Kept between phrases, mirroring what whisper.cpp does when it stitches segments itself,
+    /// so the decoder still hears a pause rather than two phrases welded together.
+    static let interiorOverlapMs = 100
+
+    /// Kept after the last word, and deliberately small. Trailing silence is what makes Whisper
+    /// invent a closing phrase ("Thank you.", "Děkuji.") — reported against 0.11.0 on a clip
+    /// where the VAD had found the speech correctly (#87). Our first version padded segments by
+    /// 100ms on both sides *and* added 100ms of overlap to every segment end, so the tail carried
+    /// 200ms of non-speech where whisper.cpp's own defaults carry 130ms. Widening the padding
+    /// protected word onsets and made the end worse; the two ends want opposite things.
+    static let tailPaddingMs = 20
+
     static func speechOnlySamples(from samples: [Float], segments: [WhisperVadSegment]) -> [Float] {
-        let sampleRate = 16000
-        let overlap = sampleRate / 10
-        let gap = [Float](repeating: 0, count: overlap)
+        // Degenerate segments are dropped first so "first" and "last" mean the first and last
+        // ones actually kept, not positions in the VAD's raw output.
+        let usable = segments.filter { $0.endCs > $0.startCs }
+        guard !usable.isEmpty else { return [] }
+
+        let rate = vadSampleRate
+        let onset = onsetPaddingMs * rate / 1000
+        let interior = interiorOverlapMs * rate / 1000
+        let tail = tailPaddingMs * rate / 1000
+        let gap = [Float](repeating: 0, count: interior)
 
         var result: [Float] = []
         result.reserveCapacity(samples.count)
 
-        for (index, segment) in segments.enumerated() {
-            // Checked on the segment, not on the padded range: the overlap below would
-            // otherwise turn an empty segment into 0.1s of spurious audio.
-            guard segment.endCs > segment.startCs else { continue }
+        for (index, segment) in usable.enumerated() {
+            let isFirst = index == 0
+            let isLast = index == usable.count - 1
 
-            let start = max(0, Int(segment.startCs) * sampleRate / 100)
-            let end = min(samples.count, Int(segment.endCs) * sampleRate / 100 + overlap)
+            let start = max(0, Int(segment.startCs) * rate / 100 - (isFirst ? onset : 0))
+            let end = min(samples.count,
+                          Int(segment.endCs) * rate / 100 + (isLast ? tail : interior))
             guard start < end else { continue }
 
-            if index > 0 && !result.isEmpty {
+            if !result.isEmpty {
                 result.append(contentsOf: gap)
             }
             result.append(contentsOf: samples[start..<end])
