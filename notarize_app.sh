@@ -1,5 +1,8 @@
 #!/bin/bash
-set -e
+# pipefail is what makes a failed build fail the script: xcodebuild is piped into xcpretty,
+# and a pipeline reports the status of its last command, so xcpretty's cheerful 0 was hiding
+# "** BUILD FAILED **" and letting the release carry on with a stale app bundle.
+set -e -o pipefail
 
 # === Configuration ===
 # Usage: ./notarize_app.sh "Developer ID Application: … (TEAMID)" [arm64|x86_64]

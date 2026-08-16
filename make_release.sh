@@ -83,12 +83,9 @@ if [[ ! -f "./notarize_app.sh" ]]; then
 fi
 
 chmod +x ./notarize_app.sh
+# No exit-code check here: `set -e` already aborts on a non-zero return, so a test on $? would
+# only ever see the 0 of a script that succeeded.
 ./notarize_app.sh "${CODE_SIGN_IDENTITY}"
-
-if [[ $? -ne 0 ]]; then
-    echo "❌ Build/notarization failed!"
-    exit 1
-fi
 
 echo "✅ Build and notarization successful!"
 
