@@ -105,17 +105,28 @@ private struct DictionaryRuleEditor: View {
             Divider().overlay(STheme.border)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("When it hears")
-                    .scaledFont(size: 9, weight: .bold)
-                    .tracking(0.6)
-                    .textCase(.uppercase)
-                    .foregroundColor(STheme.sectionTitle)
+                HStack {
+                    Text(entry.isRegex ? "When it matches" : "When it hears")
+                        .scaledFont(size: 9, weight: .bold)
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                        .foregroundColor(STheme.sectionTitle)
+
+                    Spacer()
+
+                    Toggle("Regex", isOn: $entry.isRegex)
+                        .toggleStyle(.checkbox)
+                        .scaledFont(size: 10)
+                        .foregroundColor(STheme.hint)
+                        .help("Match with a regular expression and use $1, $2… in the result")
+                }
 
                 ForEach(Array(triggerBindings().enumerated()), id: \.offset) { position, binding in
                     HStack(spacing: 6) {
-                        TextField("", text: binding, prompt: Text("git hub"))
+                        TextField("", text: binding,
+                                  prompt: Text(entry.isRegex ? "([^.?!]+), said ([A-Z]\\w+)" : "git hub"))
                             .textFieldStyle(.plain)
-                            .scaledFont(size: 12)
+                            .scaledFont(size: 12, design: entry.isRegex ? .monospaced : .default)
                             .focused($focused, equals: position)
 
                         Button { entry.removeTrigger(at: position) } label: {
@@ -135,7 +146,7 @@ private struct DictionaryRuleEditor: View {
                     entry.alternates.append("")
                     focused = entry.triggers.count
                 } label: {
-                    Label("Another way of saying it", systemImage: "plus")
+                    Label(entry.isRegex ? "Another pattern" : "Another way of saying it", systemImage: "plus")
                         .scaledFont(size: 11)
                         .foregroundColor(STheme.accent)
                 }
@@ -146,19 +157,23 @@ private struct DictionaryRuleEditor: View {
             Divider().overlay(STheme.border)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("Spacing")
-                    .scaledFont(size: 9, weight: .bold)
-                    .tracking(0.6)
-                    .textCase(.uppercase)
-                    .foregroundColor(STheme.sectionTitle)
+                // A regex says for itself what it consumes, so the spacing choice would be a
+                // second, contradictory answer to the same question.
+                if !entry.isRegex {
+                    Text("Spacing")
+                        .scaledFont(size: 9, weight: .bold)
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                        .foregroundColor(STheme.sectionTitle)
 
-                Picker("", selection: $entry.spacing) {
-                    Text("Keep spaces").tag(CustomDictionaryEntry.Spacing.standalone)
-                    Text("Opens").tag(CustomDictionaryEntry.Spacing.attachesRight)
-                    Text("Closes").tag(CustomDictionaryEntry.Spacing.attachesLeft)
+                    Picker("", selection: $entry.spacing) {
+                        Text("Keep spaces").tag(CustomDictionaryEntry.Spacing.standalone)
+                        Text("Opens").tag(CustomDictionaryEntry.Spacing.attachesRight)
+                        Text("Closes").tag(CustomDictionaryEntry.Spacing.attachesLeft)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
 
                 // The rule doing its job beats a description of what it does.
                 Text(preview)
@@ -181,7 +196,16 @@ private struct DictionaryRuleEditor: View {
         .frame(width: 280)
     }
 
+    /// A sentence the rule is likely to bite on, so the effect is visible rather than described.
+    /// For a regex there is no way to build one from the pattern, so a fixed line of dialogue
+    /// stands in: it is the case this was added for, and a pattern that does nothing to it
+    /// shows that just as usefully.
+    private static let regexSample = "Not tonight, said Frank."
+
     private var preview: String {
+        guard !entry.isRegex else {
+            return CustomDictionary.apply(Self.regexSample, entries: [entry])
+        }
         let spoken = entry.triggers.first ?? "…"
         let sample: String
         switch entry.spacing {

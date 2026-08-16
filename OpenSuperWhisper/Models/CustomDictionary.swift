@@ -30,13 +30,27 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
     var alternates: [String]
     var spacing: Spacing
 
+    /// Treat the triggers as regular expressions and the replacement as a template, so `$1` and
+    /// friends work.
+    ///
+    /// Added because the alternative was shipping a feature for one person. A novelist dictating
+    /// fiction gets her words back with no quotation marks, since a quotation mark is not a
+    /// sound, and the shape she needs is one substitution: what precedes "said Frank" is speech.
+    /// That is a rule, not a feature, and expressed this way it is also every other rule nobody
+    /// has asked for yet.
+    ///
+    /// A regex rule owns its own boundaries: no `\b` is added around it and `spacing` does not
+    /// apply, since the pattern already says what it wants to consume.
+    var isRegex: Bool
+
     init(id: UUID = UUID(), original: String = "", replacement: String = "",
-         alternates: [String] = [], spacing: Spacing = .standalone) {
+         alternates: [String] = [], spacing: Spacing = .standalone, isRegex: Bool = false) {
         self.id = id
         self.original = original
         self.replacement = replacement
         self.alternates = alternates
         self.spacing = spacing
+        self.isRegex = isRegex
     }
 
     /// Hand-written so dictionaries saved before `alternates` and `spacing` existed still load;
@@ -48,6 +62,7 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
         replacement = try container.decode(String.self, forKey: .replacement)
         alternates = try container.decodeIfPresent([String].self, forKey: .alternates) ?? []
         spacing = try container.decodeIfPresent(Spacing.self, forKey: .spacing) ?? .standalone
+        isRegex = try container.decodeIfPresent(Bool.self, forKey: .isRegex) ?? false
     }
 
     /// Every phrasing this rule matches, the primary one first.
@@ -95,27 +110,41 @@ enum CustomDictionary {
             // Longest first, so "opening quote" isn't half-eaten by a "quote" alternate on the
             // same rule.
             for trigger in entry.triggers.sorted(by: { $0.count > $1.count }) {
-                let escaped = NSRegularExpression.escapedPattern(for: trigger)
-                // Only add a \b assertion where the adjacent character of the search
-                // term is itself a word character — otherwise the boundary never
-                // matches for terms that start/end with punctuation (e.g. "C++").
-                let leadingBoundary = isWordCharacter(trigger.first) ? "\\b" : ""
-                let trailingBoundary = isWordCharacter(trigger.last) ? "\\b" : ""
+                let pattern: String
+                let template: String
 
-                // Punctuation has to swallow the space on the side it belongs to, or an opening
-                // quote lands as `he said " hello`. Only horizontal space is eaten: a rule must
-                // not silently pull two paragraphs together.
-                let eatBefore = entry.spacing == .attachesLeft ? "[ \\t]*" : ""
-                let eatAfter = entry.spacing == .attachesRight ? "[ \\t]*" : ""
-                let pattern = eatBefore + leadingBoundary + escaped + trailingBoundary + eatAfter
+                if entry.isRegex {
+                    // The user's pattern is authoritative: no boundaries bolted on, no spacing
+                    // padding, and `$1` left alive in the replacement. Their rule already says
+                    // what it consumes and what it puts back.
+                    pattern = trigger
+                    template = replacement
+                } else {
+                    let escaped = NSRegularExpression.escapedPattern(for: trigger)
+                    // Only add a \b assertion where the adjacent character of the search
+                    // term is itself a word character — otherwise the boundary never
+                    // matches for terms that start/end with punctuation (e.g. "C++").
+                    let leadingBoundary = isWordCharacter(trigger.first) ? "\\b" : ""
+                    let trailingBoundary = isWordCharacter(trigger.last) ? "\\b" : ""
 
+                    // Punctuation has to swallow the space on the side it belongs to, or an
+                    // opening quote lands as `he said " hello`. Only horizontal space is eaten:
+                    // a rule must not silently pull two paragraphs together.
+                    let eatBefore = entry.spacing == .attachesLeft ? "[ \\t]*" : ""
+                    let eatAfter = entry.spacing == .attachesRight ? "[ \\t]*" : ""
+                    pattern = eatBefore + leadingBoundary + escaped + trailingBoundary + eatAfter
+                    // Use the trimmed replacement (consistent with promptBoost) so a stray
+                    // leading/trailing space in the rule doesn't produce double spaces.
+                    template = NSRegularExpression.escapedTemplate(for: replacement)
+                }
+
+                // A pattern that does not compile is skipped, which is what makes a half-typed
+                // regex harmless: the transcription passes through untouched rather than the
+                // rule doing something arbitrary.
                 guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
                 else { continue }
 
                 let range = NSRange(result.startIndex..., in: result)
-                // Use the trimmed replacement (consistent with promptBoost) so a stray leading/
-                // trailing space in the rule doesn't produce double spaces in the output.
-                let template = NSRegularExpression.escapedTemplate(for: replacement)
                 result = regex.stringByReplacingMatches(in: result, options: [], range: range,
                                                         withTemplate: template)
             }
@@ -137,6 +166,9 @@ enum CustomDictionary {
         struct Key: Hashable {
             let replacement: String
             let spacing: CustomDictionaryEntry.Spacing
+            /// A regex rule writing "$1" is not the same rule as a literal one writing "$1",
+            /// so they must not fold together.
+            let isRegex: Bool
         }
 
         var result: [CustomDictionaryEntry] = []
@@ -149,7 +181,8 @@ enum CustomDictionary {
                 continue
             }
 
-            let key = Key(replacement: replacement, spacing: entry.spacing)
+            let key = Key(replacement: replacement, spacing: entry.spacing,
+                          isRegex: entry.isRegex)
             guard let position = positionByKey[key] else {
                 positionByKey[key] = result.count
                 result.append(entry)
@@ -174,6 +207,9 @@ enum CustomDictionary {
     static func boostTerms(entries: [CustomDictionaryEntry]) -> [String] {
         var seen = Set<String>()
         return entries
+            // A regex replacement is a template, not a word. Boosting "$1," would teach the
+            // model nothing and put punctuation in the prompt.
+            .filter { !$0.isRegex }
             .map { $0.replacement.trimmingCharacters(in: .whitespacesAndNewlines) }
             // Punctuation rules ("open quote" → `"`) have nothing to teach a model about
             // spelling, and boosting a bare quote mark would just litter the prompt.
