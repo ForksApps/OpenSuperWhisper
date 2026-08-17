@@ -5,6 +5,19 @@
     <description>Updates for OpenSuperWhisper</description>
     <language>en</language>
     <item>
+      <title>0.12.1</title>
+      <link>https://github.com/my-monkeys/OpenSuperWhisper/releases/tag/v0.12.1</link>
+      <sparkle:version>50</sparkle:version>
+      <sparkle:shortVersionString>0.12.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 17 Aug 2026 10:55:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/my-monkeys/OpenSuperWhisper/releases/download/v0.12.1/OpenSuperWhisper-arm64-0.12.1.dmg"
+        sparkle:edSignature="BWIPBIwFYoksVJJRwTx99xQ0W8VmHeIgWT4zGR97lG14s/KUE4U/Vx53buK9WIbrdJ8P/FzhCDSjgHzqUgRZAw=="
+        length="31920763"
+        type="application/octet-stream" />
+    </item>
+    <item>
       <title>0.12.0</title>
       <link>https://github.com/my-monkeys/OpenSuperWhisper/releases/tag/v0.12.0</link>
       <sparkle:version>49</sparkle:version>
