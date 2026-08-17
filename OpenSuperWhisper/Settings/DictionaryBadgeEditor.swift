@@ -13,8 +13,12 @@ struct DictionaryBadgeEditor: View {
 
     var body: some View {
         FlowLayout(spacing: 6) {
-            ForEach($entries) { $entry in
-                badge(for: $entry)
+            // Iterated by value, not with `ForEach($entries)`. A binding produced by a
+            // collection resolves through the collection every time it is read, so deleting a
+            // rule while its editor was still on screen left the open text field reading a row
+            // that no longer existed, and the app trapped the moment the field lost focus.
+            ForEach(entries) { entry in
+                badge(for: entry)
             }
             addBadge
         }
@@ -24,8 +28,7 @@ struct DictionaryBadgeEditor: View {
         .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
     }
 
-    private func badge(for entry: Binding<CustomDictionaryEntry>) -> some View {
-        let value = entry.wrappedValue
+    private func badge(for value: CustomDictionaryEntry) -> some View {
         let label = value.replacement.trimmingCharacters(in: .whitespacesAndNewlines)
         let count = value.triggers.count
 
@@ -54,10 +57,17 @@ struct DictionaryBadgeEditor: View {
         .popover(isPresented: Binding(get: { editing == value.id },
                                       set: { if !$0 { editing = nil } }),
                  arrowEdge: .bottom) {
-            DictionaryRuleEditor(entry: entry) {
-                entries.removeAll { $0.id == value.id }
-                editing = nil
-            }
+            DictionaryRuleEditor(
+                initial: value,
+                onChange: { updated in
+                    guard let position = entries.firstIndex(where: { $0.id == updated.id })
+                    else { return }
+                    entries[position] = updated
+                },
+                onDelete: {
+                    editing = nil
+                    entries.removeAll { $0.id == value.id }
+                })
         }
     }
 
@@ -82,10 +92,26 @@ struct DictionaryBadgeEditor: View {
 
 /// What sits behind one badge: the result on top, everything that reaches it underneath.
 private struct DictionaryRuleEditor: View {
-    @Binding var entry: CustomDictionaryEntry
+    let onChange: (CustomDictionaryEntry) -> Void
     let onDelete: () -> Void
 
+    /// The rule being edited lives here rather than in the array behind it.
+    ///
+    /// Editing through a binding into the collection means every keystroke resolves the row out
+    /// of that collection again, which works right up until the row is deleted while a field is
+    /// still open. Editing a local copy and publishing it on change means the worst case is an
+    /// editor working on a rule that no longer exists, instead of a trap.
+    @State private var draft: CustomDictionaryEntry
+
     @FocusState private var focused: Int?
+
+    init(initial: CustomDictionaryEntry,
+         onChange: @escaping (CustomDictionaryEntry) -> Void,
+         onDelete: @escaping () -> Void) {
+        self.onChange = onChange
+        self.onDelete = onDelete
+        _draft = State(initialValue: initial)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -96,7 +122,7 @@ private struct DictionaryRuleEditor: View {
                     .textCase(.uppercase)
                     .foregroundColor(STheme.sectionTitle)
 
-                TextField("", text: $entry.replacement, prompt: Text("GitHub"))
+                TextField("", text: $draft.replacement, prompt: Text("GitHub"))
                     .textFieldStyle(.plain)
                     .scaledFont(size: 16, weight: .semibold)
                     .foregroundColor(STheme.textBright)
@@ -106,7 +132,7 @@ private struct DictionaryRuleEditor: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text(entry.isRegex ? "When it matches" : "When it hears")
+                    Text(draft.isRegex ? "When it matches" : "When it hears")
                         .scaledFont(size: 9, weight: .bold)
                         .tracking(0.6)
                         .textCase(.uppercase)
@@ -114,7 +140,7 @@ private struct DictionaryRuleEditor: View {
 
                     Spacer()
 
-                    Toggle("Regex", isOn: $entry.isRegex)
+                    Toggle("Regex", isOn: $draft.isRegex)
                         .toggleStyle(.checkbox)
                         .scaledFont(size: 10)
                         .foregroundColor(STheme.hint)
@@ -124,18 +150,18 @@ private struct DictionaryRuleEditor: View {
                 ForEach(Array(triggerBindings().enumerated()), id: \.offset) { position, binding in
                     HStack(spacing: 6) {
                         TextField("", text: binding,
-                                  prompt: Text(entry.isRegex ? "([^.?!]+), said ([A-Z]\\w+)" : "git hub"))
+                                  prompt: Text(draft.isRegex ? "([^.?!]+), said ([A-Z]\\w+)" : "git hub"))
                             .textFieldStyle(.plain)
-                            .scaledFont(size: 12, design: entry.isRegex ? .monospaced : .default)
+                            .scaledFont(size: 12, design: draft.isRegex ? .monospaced : .default)
                             .focused($focused, equals: position)
 
-                        Button { entry.removeTrigger(at: position) } label: {
+                        Button { draft.removeTrigger(at: position) } label: {
                             Image(systemName: "minus.circle")
                                 .scaledFont(size: 10)
                                 .foregroundColor(STheme.hint)
                         }
                         .buttonStyle(.plain)
-                        .disabled(position == 0 && entry.alternates.isEmpty)
+                        .disabled(position == 0 && draft.alternates.isEmpty)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
@@ -143,10 +169,10 @@ private struct DictionaryRuleEditor: View {
                 }
 
                 Button {
-                    entry.alternates.append("")
-                    focused = entry.triggers.count
+                    draft.alternates.append("")
+                    focused = draft.triggers.count
                 } label: {
-                    Label(entry.isRegex ? "Another pattern" : "Another way of saying it", systemImage: "plus")
+                    Label(draft.isRegex ? "Another pattern" : "Another way of saying it", systemImage: "plus")
                         .scaledFont(size: 11)
                         .foregroundColor(STheme.accent)
                 }
@@ -159,14 +185,14 @@ private struct DictionaryRuleEditor: View {
             VStack(alignment: .leading, spacing: 5) {
                 // A regex says for itself what it consumes, so the spacing choice would be a
                 // second, contradictory answer to the same question.
-                if !entry.isRegex {
+                if !draft.isRegex {
                     Text("Spacing")
                         .scaledFont(size: 9, weight: .bold)
                         .tracking(0.6)
                         .textCase(.uppercase)
                         .foregroundColor(STheme.sectionTitle)
 
-                    Picker("", selection: $entry.spacing) {
+                    Picker("", selection: $draft.spacing) {
                         Text("Keep spaces").tag(CustomDictionaryEntry.Spacing.standalone)
                         Text("Opens").tag(CustomDictionaryEntry.Spacing.attachesRight)
                         Text("Closes").tag(CustomDictionaryEntry.Spacing.attachesLeft)
@@ -194,6 +220,9 @@ private struct DictionaryRuleEditor: View {
         }
         .padding(14)
         .frame(width: 280)
+        // Published per edit, so the row behind the badge stays in step with the field as it is
+        // typed, exactly as it did when the field wrote straight into the array.
+        .onChange(of: draft) { _, updated in onChange(updated) }
     }
 
     /// A sentence the rule is likely to bite on, so the effect is visible rather than described.
@@ -203,26 +232,26 @@ private struct DictionaryRuleEditor: View {
     private static let regexSample = "Not tonight, said Frank."
 
     private var preview: String {
-        guard !entry.isRegex else {
-            return CustomDictionary.apply(Self.regexSample, entries: [entry])
+        guard !draft.isRegex else {
+            return CustomDictionary.apply(Self.regexSample, entries: [draft])
         }
-        let spoken = entry.triggers.first ?? "…"
+        let spoken = draft.triggers.first ?? "…"
         let sample: String
-        switch entry.spacing {
+        switch draft.spacing {
         case .attachesRight: sample = "he said \(spoken) yes"
         case .attachesLeft: sample = "yes \(spoken) he said"
         case .standalone: sample = "yes \(spoken) no"
         }
-        return CustomDictionary.apply(sample, entries: [entry])
+        return CustomDictionary.apply(sample, entries: [draft])
     }
 
     /// The primary phrasing and its alternates edited as one list, since the distinction is an
     /// implementation detail the user has no reason to care about.
     private func triggerBindings() -> [Binding<String>] {
-        [Binding(get: { entry.original }, set: { entry.original = $0 })]
-            + entry.alternates.indices.map { index in
-                Binding(get: { entry.alternates.indices.contains(index) ? entry.alternates[index] : "" },
-                        set: { if entry.alternates.indices.contains(index) { entry.alternates[index] = $0 } })
+        [Binding(get: { draft.original }, set: { draft.original = $0 })]
+            + draft.alternates.indices.map { index in
+                Binding(get: { draft.alternates.indices.contains(index) ? draft.alternates[index] : "" },
+                        set: { if draft.alternates.indices.contains(index) { draft.alternates[index] = $0 } })
             }
     }
 
