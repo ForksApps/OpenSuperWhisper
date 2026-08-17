@@ -220,9 +220,15 @@ private struct DictionaryRuleEditor: View {
         }
         .padding(14)
         .frame(width: 280)
-        // Published per edit, so the row behind the badge stays in step with the field as it is
-        // typed, exactly as it did when the field wrote straight into the array.
-        .onChange(of: draft) { _, updated in onChange(updated) }
+        // Committed when the editor goes away, not per keystroke.
+        //
+        // Writing on every change fed a second update pass back into the badge row: the row
+        // rebuilt, which re-declared this popover, which had SwiftUI re-present the NSPopover
+        // mid-layout. That threw from AppKit while ordering the popover's window on screen.
+        // Nothing behind the popover is visible while it is open, so there is nothing to gain
+        // from updating it live, and the edit is not lost: it lands the moment the popover
+        // closes, which is also when the badge becomes worth looking at again.
+        .onDisappear { onChange(draft) }
     }
 
     /// A sentence the rule is likely to bite on, so the effect is visible rather than described.
