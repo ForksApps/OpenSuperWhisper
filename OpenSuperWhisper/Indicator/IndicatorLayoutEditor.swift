@@ -34,13 +34,15 @@ struct IndicatorLayoutEditor: View {
     // MARK: - Position
 
     private var positionRow: some View {
-        SRow(title: "Position", hint: "Where the bubble appears while recording") {
+        SRow(title: "Position",
+             hint: "Where the bubble appears while recording. Drag the bubble itself to put it somewhere of your own, which also switches this to \"Where you drop it\". That one mode lets the bubble take clicks, so it stops being invisible to the app underneath.") {
             Picker("", selection: $viewModel.indicatorPosition) {
                 Text("Near cursor").tag("cursor")
                 Text("Notch").tag("notch")
                 Text("Top").tag("top")
                 Text("Center").tag("center")
                 Text("Bottom").tag("bottom")
+                Text("Where you drop it").tag("custom")
             }
             .pickerStyle(.menu)
             .labelsHidden()
