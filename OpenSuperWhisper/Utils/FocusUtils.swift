@@ -186,8 +186,20 @@ class FocusUtils {
         return true
     }
 
+    /// Whether an accessibility error means "nothing is focused" rather than "the question
+    /// could not be answered".
+    ///
+    /// Only the first is evidence. `cannotComplete` is what a target that did not reply in
+    /// time returns, and the system-wide element returns it in situations where asking the
+    /// application directly succeeds, so treating it as an answer is how a working text field
+    /// gets mistaken for none at all.
+    static func reportsNothingFocused(_ error: AXError) -> Bool {
+        error == .noValue || error == .attributeUnsupported
+    }
+
     /// Best-effort check of whether the system-wide focused element can receive
-    /// pasted text. Returns `nil` when undeterminable (no Accessibility trust).
+    /// pasted text. Returns `nil` when undeterminable (no Accessibility trust, or a query
+    /// that failed for a reason that says nothing about whether a text field is there).
     static func focusedElementIsEditable() -> Bool? {
         guard AXIsProcessTrusted() else { return nil }
 
@@ -198,6 +210,11 @@ class FocusUtils {
                                                 kAXFocusedUIElementAttribute as CFString,
                                                 &focused)
         guard err == .success, let focusedCF = focused else {
+            // Reported as "no editable target" only when the system actually said nothing is
+            // focused. Anything else leaves us unable to tell, and the caller must go ahead and
+            // type: a failed question used to silently downgrade the dictation to the clipboard,
+            // and it stayed that way until the user opened and closed Settings.
+            guard reportsNothingFocused(err) else { return nil }
             return classifyEditability(hasFocusedElement: false, valueIsSettable: false, role: nil)
         }
         let element = focusedCF as! AXUIElement
