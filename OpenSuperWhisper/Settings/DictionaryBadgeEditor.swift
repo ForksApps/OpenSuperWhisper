@@ -74,6 +74,10 @@ struct DictionaryBadgeEditor: View {
                 .padding(.vertical, 6)
                 .background(Capsule().strokeBorder(STheme.controlBorder,
                                                    style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                // The other badges are filled, so their whole capsule takes a click. This one is
+                // only a dashed outline, and an outline is hit-tested along the line itself, which
+                // left the inside of the capsule dead and forced people to hit the small glyph.
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .help("Add a rule")
