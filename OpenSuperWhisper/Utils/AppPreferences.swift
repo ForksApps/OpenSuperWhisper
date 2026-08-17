@@ -384,6 +384,28 @@ final class AppPreferences {
     @UserDefault(key: "indicatorPosition", defaultValue: "cursor")
     var indicatorPosition: String
 
+    /// Where the bubble was last dragged to, as "x,y": the middle of its bottom edge in screen
+    /// coordinates.
+    ///
+    /// The same pair of anchors the preset positions produce, so a bubble you dropped somewhere
+    /// grows upward from that spot exactly as the presets do rather than drifting as its contents
+    /// change. nil until it has been dragged once.
+    @OptionalUserDefault(key: "indicatorCustomAnchor")
+    private var indicatorCustomAnchorRaw: String?
+
+    var indicatorCustomAnchor: CGPoint? {
+        get {
+            guard let raw = indicatorCustomAnchorRaw else { return nil }
+            let parts = raw.split(separator: ",").compactMap { Double($0) }
+            guard parts.count == 2 else { return nil }
+            return CGPoint(x: parts[0], y: parts[1])
+        }
+        set {
+            guard let newValue else { indicatorCustomAnchorRaw = nil; return }
+            indicatorCustomAnchorRaw = "\(newValue.x),\(newValue.y)"
+        }
+    }
+
     /// The bubble's contents as JSON (`IndicatorLayout`): which elements it shows and in
     /// what order. Empty until `migrateIndicatorLayout()` builds one from the old
     /// meter-mode / show-stop / show-cancel preferences.

@@ -65,8 +65,12 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             // `resizeToContent` (#19), and this also stops AppKit from animating the frame on
             // its own. Size changes should snap, never animate (macOS 26 recursion guard).
             panel.animationBehavior = .none
+            // Grabbing the bubble anywhere that is not a button moves it. Only reachable when the
+            // panel accepts mouse events at all, which is the opt-in below.
+            panel.isMovableByWindowBackground = true
 
             self.window = panel
+            observeDrag(of: panel)
         }
         
         // Host the SwiftUI content and size the window to it *ourselves* (see `resizeToContent`).
@@ -95,8 +99,10 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         // Accept clicks only when an on-bubble button is enabled (so it's tappable);
         // otherwise stay fully click-through (baseline). Re-evaluated each show() so
         // toggling the setting takes effect on the next recording.
-        window?.ignoresMouseEvents = !(AppPreferences.shared.showStopButtonOnIndicator
-            || AppPreferences.shared.showCancelButtonOnIndicator)
+        window?.ignoresMouseEvents = !Self.needsMouseEvents(
+            position: AppPreferences.shared.indicatorPosition,
+            showsStop: AppPreferences.shared.showStopButtonOnIndicator,
+            showsCancel: AppPreferences.shared.showCancelButtonOnIndicator)
 
         // Position window - use the screen containing the point, or main screen as fallback
         let targetScreen = point.flatMap { FocusUtils.screenContaining(point: $0) } ?? NSScreen.main
@@ -120,6 +126,12 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             case "bottom":
                 anchorCenterX = screenFrame.midX
                 anchorBottomY = screenFrame.minY + 120
+            case "custom":
+                // Wherever it was last dropped. Falls back to the centre of the screen if the
+                // mode is set but nothing has been dragged yet, so it is never off-screen.
+                let dropped = AppPreferences.shared.indicatorCustomAnchor
+                anchorCenterX = dropped?.x ?? screenFrame.midX
+                anchorBottomY = dropped?.y ?? screenFrame.midY
             default: // "cursor": sit just above the caret, falling back to a band near the top
                 if let point = point {
                     anchorBottomY = point.y + 20
@@ -173,6 +185,49 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         }
     }
 
+    /// Whether the bubble should accept clicks instead of letting them through to the app below.
+    ///
+    /// Click-through is the baseline: the indicator never intercepts a click meant for what you
+    /// are dictating into. Two things override it. On-bubble buttons, which have to be tappable to
+    /// exist at all. And the draggable position, because a bubble you are meant to grab has to be
+    /// grabbable, which is the trade you accept by choosing that mode and no other.
+    nonisolated static func needsMouseEvents(position: String, showsStop: Bool,
+                                             showsCancel: Bool) -> Bool {
+        showsStop || showsCancel || position == "custom"
+    }
+
+    /// The origin `reposition` last asked for, so the window's own move notification is not
+    /// mistaken for the user dragging the bubble.
+    ///
+    /// Compared by value rather than guarded with a flag, because the move notification is not
+    /// guaranteed to arrive inside the `setFrameOrigin` call that caused it.
+    private var lastPlacedOrigin: NSPoint?
+
+    private var dragObserver: NSObjectProtocol?
+
+    /// Remembers where the bubble is dropped, and switches the position mode to match.
+    ///
+    /// Dragging something is a plainer statement of intent than picking from a menu, so a drop
+    /// wins: whatever preset was selected becomes "custom", and the bubble stays where it was put,
+    /// including across restarts.
+    private func observeDrag(of panel: NSWindow) {
+        dragObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didMoveNotification, object: panel, queue: .main
+        ) { [weak self, weak panel] _ in
+            guard let self, let panel else { return }
+            let origin = panel.frame.origin
+            if let placed = lastPlacedOrigin,
+               abs(placed.x - origin.x) < 1, abs(placed.y - origin.y) < 1 { return }
+
+            let anchor = CGPoint(x: panel.frame.midX, y: panel.frame.minY)
+            AppPreferences.shared.indicatorCustomAnchor = anchor
+            AppPreferences.shared.indicatorPosition = "custom"
+            anchorFromTop = false
+            anchorCenterX = anchor.x
+            anchorBottomY = anchor.y
+        }
+    }
+
     private func reposition(window: NSWindow, screen: NSScreen) {
         let w = window.frame.width
         let h = window.frame.height
@@ -182,7 +237,9 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         let y = anchorFromTop
             ? max(screenFrame.minY, anchorTopY - h)
             : max(screenFrame.minY, min(anchorBottomY, screenFrame.maxY - h))
-        window.setFrameOrigin(NSPoint(x: x, y: y))
+        let origin = NSPoint(x: x, y: y)
+        lastPlacedOrigin = origin
+        window.setFrameOrigin(origin)
     }
 
     /// Briefly shows the indicator at the configured position (without recording) so the user
